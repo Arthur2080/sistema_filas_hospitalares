@@ -1,132 +1,189 @@
-import java.util.*;
+import java.util.ArrayList;
 
 /**
- * Regras do pronto-socorro e cálculo do simulador.
+ * Guarda os grupos de pacientes informados no dashboard e calcula os indicadores.
  *
- * O usuário informa grupos de pacientes: a cor de risco, quantos pacientes e quanto tempo esperaram até o médico.
- * Cada grupo vira "quantidade" pacientes com a mesma espera, e a classe Estatistica calcula sobre essa lista.
+ * Cada grupo vira "quantidade" pacientes com a mesma espera.
  * Ex.: 5 amarelos com 30 min + 3 verdes com 150 min → [30, 30, 30, 30, 30, 150, 150, 150]
  */
 public class Simulacao {
 
-    record CorRisco(String nome, int prioridade, int tempoMaxMin, String fila) {}
+    private ArrayList<GrupoPacientes> grupos = new ArrayList<>();
 
-    record Grupo(CorRisco cor, int quantidade, double espera) {}
+    public void adicionarGrupo(GrupoPacientes grupo) {
+        grupos.add(grupo);
+    }
 
-    /** Protocolo de Manchester: prioridade 1 é a mais grave. O tempo máximo é a espera aceitável até o médico. */
-    static final List<CorRisco> CORES = List.of(
-            new CorRisco("Vermelho", 1, 0, "IMEDIATA"),
-            new CorRisco("Laranja", 2, 10, "PRINCIPAL"),
-            new CorRisco("Amarelo", 3, 60, "PRINCIPAL"),
-            new CorRisco("Verde", 4, 120, "FAST_TRACK"),
-            new CorRisco("Azul", 5, 240, "FAST_TRACK"));
+    public ArrayList<GrupoPacientes> getGrupos() {
+        return grupos;
+    }
 
-    static CorRisco corPorPrioridade(int prioridade) {
-        for (CorRisco c : CORES) {
-            if (c.prioridade() == prioridade) return c;
+    public boolean estaVazia() {
+        return grupos.isEmpty();
+    }
+
+    // ---------------------------------------------------------------- listas para a Estatistica
+
+    /** A espera de cada paciente da simulação. */
+    public ArrayList<Double> getEsperas() {
+        ArrayList<Double> esperas = new ArrayList<>();
+        for (GrupoPacientes grupo : grupos) {
+            for (int i = 0; i < grupo.getQuantidade(); i++) {
+                esperas.add(grupo.getEspera());
+            }
         }
-        throw new IllegalArgumentException("cor de risco inexistente: " + prioridade);
+        return esperas;
     }
 
-    /** O prazo estoura quando a espera atinge o tempo máximo da cor. O vermelho é atendido na hora e não tem prazo. */
-    static boolean estourouPrazo(CorRisco c, double espera) {
-        return !c.fila().equals("IMEDIATA") && espera >= c.tempoMaxMin();
-    }
-
-    /** A espera de cada paciente: o grupo se repete "quantidade" vezes. */
-    static List<Double> esperasDosPacientes(List<Grupo> grupos) {
-        List<Double> esperas = new ArrayList<>();
-        for (Grupo g : grupos) {
-            for (int i = 0; i < g.quantidade(); i++) {
-                esperas.add(g.espera());
+    /** A espera de cada paciente de uma cor. */
+    public ArrayList<Double> getEsperas(CorRisco cor) {
+        ArrayList<Double> esperas = new ArrayList<>();
+        for (GrupoPacientes grupo : grupos) {
+            if (grupo.getCor() == cor) {
+                for (int i = 0; i < grupo.getQuantidade(); i++) {
+                    esperas.add(grupo.getEspera());
+                }
             }
         }
         return esperas;
     }
 
     /** A prioridade da cor de cada paciente, para achar a cor predominante (moda). */
-    static List<Double> prioridadesDosPacientes(List<Grupo> grupos) {
-        List<Double> prioridades = new ArrayList<>();
-        for (Grupo g : grupos) {
-            for (int i = 0; i < g.quantidade(); i++) {
-                prioridades.add((double) g.cor().prioridade());
+    public ArrayList<Double> getPrioridades() {
+        ArrayList<Double> prioridades = new ArrayList<>();
+        for (GrupoPacientes grupo : grupos) {
+            for (int i = 0; i < grupo.getQuantidade(); i++) {
+                prioridades.add((double) grupo.getCor().getPrioridade());
             }
         }
         return prioridades;
     }
 
-    /** Calcula todos os indicadores da simulação e devolve em JSON para o dashboard. */
-    static String calcular(List<Grupo> grupos) {
-        List<Double> esperas = esperasDosPacientes(grupos);
-        int total = esperas.size();
+    // ---------------------------------------------------------------- contagens
 
-        // Prazos e filas, contando pacientes (cada grupo vale "quantidade" pacientes).
-        int comPrazo = 0, estourados = 0, fastTrack = 0;
-        List<String> situacoes = new ArrayList<>();
-        for (Grupo g : grupos) {
-            if (g.cor().fila().equals("FAST_TRACK")) fastTrack += g.quantidade();
-            if (g.cor().fila().equals("IMEDIATA")) {
-                situacoes.add("\"IMEDIATO\"");
-            } else {
-                comPrazo += g.quantidade();
-                if (estourouPrazo(g.cor(), g.espera())) {
-                    estourados += g.quantidade();
-                    situacoes.add("\"ESTOURADO\"");
-                } else {
-                    situacoes.add("\"NO_PRAZO\"");
-                }
+    public int getTotalPacientes() {
+        int total = 0;
+        for (GrupoPacientes grupo : grupos) {
+            total = total + grupo.getQuantidade();
+        }
+        return total;
+    }
+
+    /** Pacientes que têm tempo máximo (todos menos os vermelhos). */
+    public int getPacientesComPrazo() {
+        int total = 0;
+        for (GrupoPacientes grupo : grupos) {
+            if (grupo.getCor().temPrazo()) {
+                total = total + grupo.getQuantidade();
             }
         }
+        return total;
+    }
+
+    public int getPacientesEstourados() {
+        int total = 0;
+        for (GrupoPacientes grupo : grupos) {
+            if (grupo.prazoEstourado()) {
+                total = total + grupo.getQuantidade();
+            }
+        }
+        return total;
+    }
+
+    public int getPacientesEstourados(CorRisco cor) {
+        int total = 0;
+        for (GrupoPacientes grupo : grupos) {
+            if (grupo.getCor() == cor && grupo.prazoEstourado()) {
+                total = total + grupo.getQuantidade();
+            }
+        }
+        return total;
+    }
+
+    public int getPacientesFastTrack() {
+        int total = 0;
+        for (GrupoPacientes grupo : grupos) {
+            if (grupo.getCor().getFila().equals("Fast Track")) {
+                total = total + grupo.getQuantidade();
+            }
+        }
+        return total;
+    }
+
+    // ---------------------------------------------------------------- resultado em JSON
+
+    /** Monta o resultado que o dashboard mostra. A simulação precisa ter pelo menos um grupo. */
+    public String toJson() {
+        ArrayList<Double> esperas = getEsperas();
+        int total = getTotalPacientes();
+        int comPrazo = getPacientesComPrazo();
+        int estourados = getPacientesEstourados();
+
+        StringBuilder json = new StringBuilder();
+        json.append("{");
+        json.append("\"pacientes\":").append(total);
+        json.append(",\"media\":").append(arredondar(Estatistica.media(esperas)));
+        json.append(",\"mediana\":").append(arredondar(Estatistica.mediana(esperas)));
+        json.append(",\"desvioPadrao\":").append(arredondar(Estatistica.desvioPadrao(esperas)));
+        json.append(",\"minimo\":").append(arredondar(Estatistica.minimo(esperas)));
+        json.append(",\"maximo\":").append(arredondar(Estatistica.maximo(esperas)));
+        json.append(",\"comPrazo\":").append(comPrazo);
+        json.append(",\"noPrazo\":").append(comPrazo - estourados);
+        json.append(",\"estourados\":").append(estourados);
+
+        // Sem pacientes com prazo (só vermelhos), não existe percentual no prazo.
+        if (comPrazo == 0) {
+            json.append(",\"percentualNoPrazo\":null");
+        } else {
+            json.append(",\"percentualNoPrazo\":").append(arredondar(100.0 * (comPrazo - estourados) / comPrazo));
+        }
+        json.append(",\"percentualFastTrack\":").append(arredondar(100.0 * getPacientesFastTrack() / total));
+
+        // Cor predominante: a moda das prioridades, convertida para o nome da cor.
+        json.append(",\"corPredominante\":[");
+        ArrayList<Double> modas = Estatistica.moda(getPrioridades());
+        for (int i = 0; i < modas.size(); i++) {
+            if (i > 0) json.append(",");
+            CorRisco cor = ProtocoloManchester.buscarCor(modas.get(i).intValue());
+            json.append("\"").append(cor.getNome()).append("\"");
+        }
+        json.append("]");
+
+        // Situação de cada grupo, na mesma ordem em que foram adicionados.
+        json.append(",\"situacoes\":[");
+        for (int i = 0; i < grupos.size(); i++) {
+            if (i > 0) json.append(",");
+            json.append("\"").append(grupos.get(i).getSituacao()).append("\"");
+        }
+        json.append("]");
 
         // Pacientes, espera média e estourados de cada cor.
-        List<String> porCor = new ArrayList<>();
-        for (CorRisco c : CORES) {
-            List<Grupo> daCor = new ArrayList<>();
-            int estouradosCor = 0;
-            for (Grupo g : grupos) {
-                if (g.cor() != c) continue;
-                daCor.add(g);
-                if (estourouPrazo(c, g.espera())) estouradosCor += g.quantidade();
+        json.append(",\"porCor\":[");
+        CorRisco[] cores = ProtocoloManchester.getCores();
+        for (int i = 0; i < cores.length; i++) {
+            CorRisco cor = cores[i];
+            ArrayList<Double> esperasDaCor = getEsperas(cor);
+            if (i > 0) json.append(",");
+            json.append("{\"nome\":\"").append(cor.getNome()).append("\"");
+            json.append(",\"prioridade\":").append(cor.getPrioridade());
+            json.append(",\"tempoMaximo\":").append(cor.getTempoMaximo());
+            json.append(",\"pacientes\":").append(esperasDaCor.size());
+            if (esperasDaCor.isEmpty()) {
+                json.append(",\"mediaEspera\":null");
+            } else {
+                json.append(",\"mediaEspera\":").append(arredondar(Estatistica.media(esperasDaCor)));
             }
-            List<Double> esperasCor = esperasDosPacientes(daCor);
-            porCor.add("{\"nome\":\"" + c.nome() + "\""
-                    + ",\"prioridade\":" + c.prioridade()
-                    + ",\"tempoMax\":" + c.tempoMaxMin()
-                    + ",\"pacientes\":" + esperasCor.size()
-                    + ",\"mediaEspera\":" + (esperasCor.isEmpty() ? "null" : num(Estatistica.media(esperasCor)))
-                    + ",\"estourados\":" + estouradosCor + "}");
+            json.append(",\"estourados\":").append(getPacientesEstourados(cor));
+            json.append("}");
         }
+        json.append("]");
 
-        return "{"
-                + "\"pacientes\":" + total
-                + ",\"media\":" + num(Estatistica.media(esperas))
-                + ",\"mediana\":" + num(Estatistica.mediana(esperas))
-                + ",\"desvioPadrao\":" + num(Estatistica.desvioPadrao(esperas))
-                + ",\"minimo\":" + num(Estatistica.minimo(esperas))
-                + ",\"maximo\":" + num(Estatistica.maximo(esperas))
-                + ",\"comPrazo\":" + comPrazo
-                + ",\"noPrazo\":" + (comPrazo - estourados)
-                + ",\"estourados\":" + estourados
-                + ",\"percentualNoPrazo\":" + (comPrazo == 0 ? "null" : num(100.0 * (comPrazo - estourados) / comPrazo))
-                + ",\"percentualFastTrack\":" + num(100.0 * fastTrack / total)
-                + ",\"corPredominante\":" + lista(Estatistica.moda(prioridadesDosPacientes(grupos)))
-                + ",\"situacoes\":" + situacoes
-                + ",\"porCor\":[" + String.join(",", porCor) + "]"
-                + "}";
+        json.append("}");
+        return json.toString();
     }
 
-    // ---------------------------------------------------------------- JSON
-
-    /** Número sem casas decimais quando é inteiro; senão, com até 4 casas. */
-    static String num(double n) {
-        return n == Math.rint(n) && Math.abs(n) < 1e15
-                ? String.valueOf((long) n)
-                : String.valueOf(Math.round(n * 10000) / 10000.0);
-    }
-
-    static String lista(List<Double> nums) {
-        StringJoiner j = new StringJoiner(",", "[", "]");
-        for (double n : nums) j.add(num(n));
-        return j.toString();
+    // Duas casas decimais bastam para minutos e percentuais.
+    private double arredondar(double valor) {
+        return Math.round(valor * 100) / 100.0;
     }
 }

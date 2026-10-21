@@ -1,27 +1,28 @@
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.TreeMap;
 
 /**
  * Cálculos estatísticos do dashboard: soma, média, mediana, desvio padrão, mínimo, máximo,
  * frequências e moda.
  *
- * Os dados são tempos de espera em minutos (da chegada até o médico) ou números que
- * representam categorias (a prioridade da cor de risco).
- * Toda lista recebida precisa ter pelo menos um valor; quem chama confere isso antes.
+ * Os dados são tempos de espera em minutos ou números que representam categorias
+ * (a prioridade da cor de risco). Toda lista recebida precisa ter pelo menos um valor.
  */
 public class Estatistica {
 
     /** Soma todos os valores da lista. */
-    static double soma(List<Double> nums) {
+    public static double soma(ArrayList<Double> numeros) {
         double total = 0;
-        for (double n : nums) {
+        for (double n : numeros) {
             total = total + n;
         }
         return total;
     }
 
     /** Média aritmética: soma dos valores dividida pela quantidade. */
-    static double media(List<Double> nums) {
-        return soma(nums) / nums.size();
+    public static double media(ArrayList<Double> numeros) {
+        return soma(numeros) / numeros.size();
     }
 
     /**
@@ -29,8 +30,8 @@ public class Estatistica {
      * Quantidade ímpar: é o elemento do meio. Quantidade par: é a média dos dois do meio.
      * Ex.: [86, 4, 49, 4] → ordenada [4, 4, 49, 86] → (4 + 49) / 2 = 26,5
      */
-    static double mediana(List<Double> nums) {
-        List<Double> ordenada = new ArrayList<>(nums);
+    public static double mediana(ArrayList<Double> numeros) {
+        ArrayList<Double> ordenada = new ArrayList<>(numeros); // cópia, para não mudar a lista original
         Collections.sort(ordenada);
 
         int meio = ordenada.size() / 2;
@@ -48,31 +49,35 @@ public class Estatistica {
      * Divide por n (e não por n - 1) porque os pacientes simulados são o grupo inteiro
      * (a população), e não uma amostra dela.
      */
-    static double desvioPadrao(List<Double> nums) {
-        double m = media(nums);
+    public static double desvioPadrao(ArrayList<Double> numeros) {
+        double media = media(numeros);
         double somaQuadrados = 0;
-        for (double n : nums) {
-            double distancia = n - m;
+        for (double n : numeros) {
+            double distancia = n - media;
             somaQuadrados = somaQuadrados + distancia * distancia;
         }
-        double variancia = somaQuadrados / nums.size();
+        double variancia = somaQuadrados / numeros.size();
         return Math.sqrt(variancia);
     }
 
     /** Menor valor da lista. */
-    static double minimo(List<Double> nums) {
-        double menor = nums.get(0);
-        for (double n : nums) {
-            if (n < menor) menor = n;
+    public static double minimo(ArrayList<Double> numeros) {
+        double menor = numeros.get(0);
+        for (double n : numeros) {
+            if (n < menor) {
+                menor = n;
+            }
         }
         return menor;
     }
 
     /** Maior valor da lista. */
-    static double maximo(List<Double> nums) {
-        double maior = nums.get(0);
-        for (double n : nums) {
-            if (n > maior) maior = n;
+    public static double maximo(ArrayList<Double> numeros) {
+        double maior = numeros.get(0);
+        for (double n : numeros) {
+            if (n > maior) {
+                maior = n;
+            }
         }
         return maior;
     }
@@ -81,34 +86,40 @@ public class Estatistica {
      * Tabela de frequências: quantas vezes cada valor aparece.
      * Ex.: [3, 4, 3, 3] → {3=3, 4=1}. O TreeMap mantém os valores em ordem crescente.
      */
-    static Map<Double, Integer> frequencias(List<Double> nums) {
-        Map<Double, Integer> freq = new TreeMap<>();
-        for (double n : nums) {
-            if (freq.containsKey(n)) {
-                freq.put(n, freq.get(n) + 1);
+    public static TreeMap<Double, Integer> frequencias(ArrayList<Double> numeros) {
+        TreeMap<Double, Integer> frequencia = new TreeMap<>();
+        for (double n : numeros) {
+            if (frequencia.containsKey(n)) {
+                frequencia.put(n, frequencia.get(n) + 1);
             } else {
-                freq.put(n, 1);
+                frequencia.put(n, 1);
             }
         }
-        return freq;
+        return frequencia;
     }
 
     /**
      * Moda: o valor (ou os valores, em caso de empate) que mais aparece.
      * Se todos aparecem uma vez só, não há moda e a lista volta vazia (amodal).
      */
-    static List<Double> moda(List<Double> nums) {
-        Map<Double, Integer> freq = frequencias(nums);
+    public static ArrayList<Double> moda(ArrayList<Double> numeros) {
+        TreeMap<Double, Integer> frequencia = frequencias(numeros);
 
         int maiorFrequencia = 0;
-        for (int contagem : freq.values()) {
-            if (contagem > maiorFrequencia) maiorFrequencia = contagem;
+        for (int contagem : frequencia.values()) {
+            if (contagem > maiorFrequencia) {
+                maiorFrequencia = contagem;
+            }
         }
 
-        List<Double> modas = new ArrayList<>();
-        if (maiorFrequencia <= 1) return modas;
-        for (double valor : freq.keySet()) {
-            if (freq.get(valor) == maiorFrequencia) modas.add(valor);
+        ArrayList<Double> modas = new ArrayList<>();
+        if (maiorFrequencia <= 1) {
+            return modas;
+        }
+        for (double valor : frequencia.keySet()) {
+            if (frequencia.get(valor) == maiorFrequencia) {
+                modas.add(valor);
+            }
         }
         return modas;
     }

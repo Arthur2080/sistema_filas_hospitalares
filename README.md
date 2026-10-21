@@ -35,16 +35,28 @@ nas contas.
 
 ```
 backend/
-  Dashboard.java         servidor HTTP: entrega a página e recebe os grupos em POST /calcular
-  Simulacao.java         cores de risco, regra de prazo e montagem do resultado
-  Estatistica.java       média, mediana, desvio padrão, mínimo, máximo, frequências e moda
-  TesteEstatistica.java  confere os cálculos com resultados feitos à mão
+  Dashboard.java            inicia o servidor HTTP na porta 8081
+  ArquivoHandler.java       entrega os arquivos da pasta frontend
+  CalcularHandler.java      recebe os grupos em POST /calcular e devolve o resultado
+  CorRisco.java             uma cor de risco: nome, prioridade, tempo máximo e fila
+  ProtocoloManchester.java  as cinco cores de risco
+  GrupoPacientes.java       cor + quantidade de pacientes + espera
+  Simulacao.java            lista de grupos, contagens e resultado em JSON
+  Estatistica.java          média, mediana, desvio padrão, mínimo, máximo, frequências e moda
+  TesteEstatistica.java     confere os cálculos com resultados feitos à mão
 frontend/
-  index.html             estrutura da página: formulário, cartões e áreas dos gráficos
+  index.html                estrutura da página: formulário, cards e áreas dos gráficos
   css/style.css
-  js/graficos.js         gráficos de colunas em SVG
-  js/app.js              formulário, chamada ao Java e desenho do resultado
+  js/app.js                 formulário, chamada ao Java, cards e gráficos de colunas
 ```
+
+## Classes
+
+- `CorRisco` e `GrupoPacientes` guardam os dados com atributos privados, construtor e getters.
+  O `GrupoPacientes` não aceita quantidade menor que 1 nem espera negativa.
+- `Simulacao` tem uma lista de `GrupoPacientes` e usa a `Estatistica` para calcular os indicadores.
+- `ArquivoHandler` e `CalcularHandler` implementam a interface `HttpHandler`; o `Dashboard` registra
+  cada um em um endereço do servidor.
 
 ## O que o Java calcula
 
