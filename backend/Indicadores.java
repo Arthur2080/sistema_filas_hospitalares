@@ -208,10 +208,12 @@ public class Indicadores {
 
         Map<Double, Integer> freqCores = Estatistica.frequencias(coresAtuais);
         Map<Double, Integer> freqHoras = Estatistica.frequencias(horas);
+        // Chegadas em cada hora, da primeira à última, contando as horas sem nenhuma chegada.
         List<Double> chegadasHora = new ArrayList<>();
-        for (int h = horas.stream().mapToInt(Double::intValue).min().orElse(0);
-             h <= horas.stream().mapToInt(Double::intValue).max().orElse(-1); h++) {
-            chegadasHora.add((double) freqHoras.getOrDefault((double) h, 0));
+        if (!horas.isEmpty()) {
+            for (int h = (int) Estatistica.minimo(horas); h <= (int) Estatistica.maximo(horas); h++) {
+                chegadasHora.add((double) freqHoras.getOrDefault((double) h, 0));
+            }
         }
 
         List<String> porCor = new ArrayList<>(), classMedicoCor = new ArrayList<>();
@@ -219,14 +221,14 @@ public class Indicadores {
             porCor.add(obj("prioridade", "" + c.prioridade(), "pacientes", "" + freqCores.getOrDefault((double) c.prioridade(), 0)));
             List<Double> l = classMedicoPorCor.getOrDefault(c.prioridade(), List.of());
             classMedicoCor.add(obj("prioridade", "" + c.prioridade(), "quantidade", "" + l.size(),
-                    "media", l.isEmpty() ? "null" : Estatistica.num(Estatistica.media(l))));
+                    "media", l.isEmpty() ? "null" : num(Estatistica.media(l))));
         }
 
         List<String> evolucao = new ArrayList<>();
         List<Double> acumulada = Estatistica.mediaAcumulada(tPortaMedico);
         for (int i = 0; i < tPortaMedico.size(); i++) {
-            evolucao.add(obj("senha", str(serieMedico.get(i)), "valor", Estatistica.num(tPortaMedico.get(i)),
-                    "media", Estatistica.num(acumulada.get(i))));
+            evolucao.add(obj("senha", str(serieMedico.get(i)), "valor", num(tPortaMedico.get(i)),
+                    "media", num(acumulada.get(i))));
         }
 
         List<String> listaDesfechos = new ArrayList<>();
@@ -247,28 +249,28 @@ public class Indicadores {
                         "aguardandoExame", "" + status.getOrDefault("AGUARDANDO_EXAME", 0),
                         "observacao", "" + status.getOrDefault("EM_OBSERVACAO", 0),
                         "finalizados", "" + finalizados),
-                "portaClassificacao", Estatistica.resumo(tPortaClass),
-                "portaMedico", Estatistica.resumo(tPortaMedico),
-                "classificacaoMedico", Estatistica.resumo(tClassMedico),
-                "permanencia", Estatistica.resumo(tPermanencia),
+                "portaClassificacao", resumo(tPortaClass),
+                "portaMedico", resumo(tPortaMedico),
+                "classificacaoMedico", resumo(tClassMedico),
+                "permanencia", resumo(tPermanencia),
                 "evolucaoPortaMedico", arr(evolucao),
                 "prazos", obj("avaliados", "" + avaliados, "estourados", "" + estourados,
                         "noPrazo", "" + (avaliados - estourados), "emAndamento", "" + emAndamento,
-                        "percentualNoPrazo", avaliados == 0 ? "null" : Estatistica.num(100.0 * (avaliados - estourados) / avaliados)),
+                        "percentualNoPrazo", avaliados == 0 ? "null" : num(100.0 * (avaliados - estourados) / avaliados)),
                 "porCor", arr(porCor),
-                "corPredominante", Estatistica.lista(Estatistica.moda(freqCores)),
+                "corPredominante", lista(Estatistica.moda(coresAtuais)),
                 "classificacaoMedicoPorCor", arr(classMedicoCor),
                 "porFila", obj("IMEDIATA", "" + porFila.getOrDefault("IMEDIATA", 0),
                         "PRINCIPAL", "" + porFila.getOrDefault("PRINCIPAL", 0),
                         "FAST_TRACK", "" + porFila.getOrDefault("FAST_TRACK", 0)),
                 "percentualFastTrack", classificados == 0 ? "null"
-                        : Estatistica.num(100.0 * porFila.getOrDefault("FAST_TRACK", 0) / classificados),
-                "chegadasPorHora", Estatistica.frequenciasJson(freqHoras),
-                "picoChegadas", Estatistica.lista(Estatistica.moda(freqHoras)),
-                "mediaChegadasHora", chegadasHora.isEmpty() ? "null" : Estatistica.num(Estatistica.media(chegadasHora)),
+                        : num(100.0 * porFila.getOrDefault("FAST_TRACK", 0) / classificados),
+                "chegadasPorHora", frequenciasJson(freqHoras),
+                "picoChegadas", lista(Estatistica.moda(horas)),
+                "mediaChegadasHora", chegadasHora.isEmpty() ? "null" : num(Estatistica.media(chegadasHora)),
                 "desfechos", arr(listaDesfechos),
                 "evasoes", "" + evasoes,
-                "taxaEvasao", finalizados == 0 ? "null" : Estatistica.num(100.0 * evasoes / finalizados),
+                "taxaEvasao", finalizados == 0 ? "null" : num(100.0 * evasoes / finalizados),
                 "chamadas", "" + Dados.CHAMADAS.size(),
                 "chamadasSemComparecimento", "" + semComparecer);
     }
@@ -406,6 +408,38 @@ public class Indicadores {
     }
 
     static String n(Number v) {
-        return v == null ? "null" : Estatistica.num(v.doubleValue());
+        return v == null ? "null" : num(v.doubleValue());
+    }
+
+    /** Número sem casas decimais quando é inteiro; senão, com até 4 casas. */
+    static String num(double n) {
+        return n == Math.rint(n) && Math.abs(n) < 1e15
+                ? String.valueOf((long) n)
+                : String.valueOf(Math.round(n * 10000) / 10000.0);
+    }
+
+    static String lista(List<Double> nums) {
+        StringJoiner j = new StringJoiner(",", "[", "]");
+        for (double n : nums) j.add(num(n));
+        return j.toString();
+    }
+
+    static String frequenciasJson(Map<Double, Integer> freq) {
+        StringJoiner j = new StringJoiner(",", "[", "]");
+        for (var e : freq.entrySet()) {
+            j.add("{\"valor\":" + num(e.getKey()) + ",\"contagem\":" + e.getValue() + "}");
+        }
+        return j.toString();
+    }
+
+    /** Resumo de uma lista de tempos: quantidade, média, mediana, desvio padrão, mínimo e máximo. */
+    static String resumo(List<Double> nums) {
+        if (nums.isEmpty()) return "{\"quantidade\":0}";
+        return obj("quantidade", "" + nums.size(),
+                "media", num(Estatistica.media(nums)),
+                "mediana", num(Estatistica.mediana(nums)),
+                "desvioPadrao", num(Estatistica.desvioPadrao(nums)),
+                "minimo", num(Estatistica.minimo(nums)),
+                "maximo", num(Estatistica.maximo(nums)));
     }
 }

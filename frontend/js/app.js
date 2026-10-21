@@ -8,7 +8,8 @@ const ESPERA_DIGITACAO = 900;
 
 let dados = null;
 let agora = RELOGIO_INICIAL;
-let tela = "visao";
+// A tela atual fica no endereço (ex.: #tempos), para abrir uma tela direto pelo link.
+let tela = Object.hasOwn(TELAS, location.hash.slice(1)) ? location.hash.slice(1) : "visao";
 const sim = { cor: 3, pacientes: [], dados: {}, timer: null, pedido: 0 };
 
 const ICONES = {
@@ -75,6 +76,7 @@ function desenharGraficos() {
 
 function irPara(novaTela) {
   tela = novaTela;
+  history.replaceState(null, "", "#" + novaTela);
   render();
   $("conteudo").focus();
   scrollTo(0, 0);

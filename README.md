@@ -16,15 +16,27 @@ java backend/Dashboard.java
 ```
 
 Depois abra http://localhost:8081. No VS Code, também dá para rodar o `Dashboard.java` direto pelo botão Run.
+Cada tela tem seu endereço: `#tempos`, `#prazos`, `#fluxo`, `#desfechos`, `#atendimentos` e `#simulador`
+(ex.: http://localhost:8081/#tempos).
+
+Para conferir os cálculos estatísticos com resultados feitos à mão:
+
+```
+java backend/TesteEstatistica.java
+```
 
 ## Pastas
 
 ```
 backend/
-  Dashboard.java     servidor HTTP e o simulador (/calcular)
-  Dados.java         dados de teste, iguais aos do SQL
-  Indicadores.java   regras de negócio e cálculo dos indicadores (/api/painel)
-  Estatistica.java   média, mediana, desvio padrão, frequências, moda e média acumulada
+  Dashboard.java         servidor HTTP e o simulador (/calcular)
+  Dados.java             dados de teste, iguais aos do SQL
+  Indicadores.java       regras de negócio, indicadores (/api/painel) e montagem do JSON
+  Estatistica.java       média, mediana, desvio padrão, mínimo, máximo, frequências, moda e média acumulada
+  TesteEstatistica.java  confere os cálculos com resultados feitos à mão
+docs/
+  roteiro-apresentacao.md  explicação do Java, do HTML e comparação das três versões
+  html-gerado/             HTML de cada tela já montado, para análise
 frontend/
   index.html         estrutura: menu, relógio e área das telas
   css/style.css

@@ -1,88 +1,129 @@
 import java.util.*;
 
-/** Métodos de cálculo do dashboard (os mesmos de antes) e a formatação dos números para JSON. */
+/**
+ * Cálculos estatísticos do dashboard: soma, média, mediana, desvio padrão, mínimo, máximo,
+ * frequências, moda e média acumulada.
+ *
+ * Os dados são tempos de espera em minutos (ex.: da chegada até o médico) ou números que
+ * representam categorias (a prioridade da cor de risco, a hora de chegada).
+ * Toda lista recebida precisa ter pelo menos um valor; quem chama confere isso antes.
+ */
 public class Estatistica {
 
+    /** Soma todos os valores da lista. */
     static double soma(List<Double> nums) {
-        double s = 0;
-        for (double n : nums) s += n;
-        return s;
+        double total = 0;
+        for (double n : nums) {
+            total = total + n;
+        }
+        return total;
     }
 
+    /** Média aritmética: soma dos valores dividida pela quantidade. */
     static double media(List<Double> nums) {
         return soma(nums) / nums.size();
     }
 
-    static double percentil(List<Double> ord, double p) {
-        double pos = p * (ord.size() - 1);
-        int baixo = (int) Math.floor(pos), alto = (int) Math.ceil(pos);
-        return ord.get(baixo) + (ord.get(alto) - ord.get(baixo)) * (pos - baixo);
+    /**
+     * Mediana: o valor do meio da lista ordenada.
+     * Quantidade ímpar: é o elemento do meio. Quantidade par: é a média dos dois do meio.
+     * Ex.: [86, 4, 49, 4] → ordenada [4, 4, 49, 86] → (4 + 49) / 2 = 26,5
+     */
+    static double mediana(List<Double> nums) {
+        List<Double> ordenada = new ArrayList<>(nums);
+        Collections.sort(ordenada);
+
+        int meio = ordenada.size() / 2;
+        if (ordenada.size() % 2 == 1) {
+            return ordenada.get(meio);
+        }
+        return (ordenada.get(meio - 1) + ordenada.get(meio)) / 2;
     }
 
+    /**
+     * Desvio padrão populacional: o quanto os valores se afastam da média, em média.
+     * 1) calcula a média; 2) soma o quadrado da distância de cada valor até a média;
+     * 3) divide pela quantidade (variância); 4) tira a raiz quadrada.
+     *
+     * Divide por n (e não por n - 1) porque os dados são todos os atendimentos do dia,
+     * a população inteira, e não uma amostra dela.
+     */
     static double desvioPadrao(List<Double> nums) {
-        double m = media(nums), s = 0;
-        for (double n : nums) s += (n - m) * (n - m);
-        return Math.sqrt(s / nums.size());
+        double m = media(nums);
+        double somaQuadrados = 0;
+        for (double n : nums) {
+            double distancia = n - m;
+            somaQuadrados = somaQuadrados + distancia * distancia;
+        }
+        double variancia = somaQuadrados / nums.size();
+        return Math.sqrt(variancia);
     }
 
+    /** Menor valor da lista. */
+    static double minimo(List<Double> nums) {
+        double menor = nums.get(0);
+        for (double n : nums) {
+            if (n < menor) menor = n;
+        }
+        return menor;
+    }
+
+    /** Maior valor da lista. */
+    static double maximo(List<Double> nums) {
+        double maior = nums.get(0);
+        for (double n : nums) {
+            if (n > maior) maior = n;
+        }
+        return maior;
+    }
+
+    /**
+     * Tabela de frequências: quantas vezes cada valor aparece.
+     * Ex.: [3, 4, 3, 3] → {3=3, 4=1}. O TreeMap mantém os valores em ordem crescente.
+     */
     static Map<Double, Integer> frequencias(List<Double> nums) {
         Map<Double, Integer> freq = new TreeMap<>();
-        for (double n : nums) freq.merge(n, 1, Integer::sum);
+        for (double n : nums) {
+            if (freq.containsKey(n)) {
+                freq.put(n, freq.get(n) + 1);
+            } else {
+                freq.put(n, 1);
+            }
+        }
         return freq;
     }
 
-    static List<Double> moda(Map<Double, Integer> freq) {
+    /**
+     * Moda: o valor (ou os valores, em caso de empate) que mais aparece.
+     * Se todos aparecem uma vez só, não há moda e a lista volta vazia (amodal).
+     */
+    static List<Double> moda(List<Double> nums) {
+        Map<Double, Integer> freq = frequencias(nums);
+
+        int maiorFrequencia = 0;
+        for (int contagem : freq.values()) {
+            if (contagem > maiorFrequencia) maiorFrequencia = contagem;
+        }
+
         List<Double> modas = new ArrayList<>();
-        if (freq.isEmpty()) return modas;
-        int max = Collections.max(freq.values());
-        if (max == 1) return modas;
-        for (var e : freq.entrySet()) {
-            if (e.getValue() == max) modas.add(e.getKey());
+        if (maiorFrequencia <= 1) return modas;
+        for (double valor : freq.keySet()) {
+            if (freq.get(valor) == maiorFrequencia) modas.add(valor);
         }
         return modas;
     }
 
+    /**
+     * Média acumulada: a média de cada valor somado aos anteriores, na ordem da lista.
+     * Ex.: [10, 20, 60] → [10, 15, 30]. Mostra como a média evolui ao longo do dia.
+     */
     static List<Double> mediaAcumulada(List<Double> nums) {
         List<Double> medias = new ArrayList<>();
-        double s = 0;
+        double total = 0;
         for (int i = 0; i < nums.size(); i++) {
-            s += nums.get(i);
-            medias.add(s / (i + 1));
+            total = total + nums.get(i);
+            medias.add(total / (i + 1));
         }
         return medias;
-    }
-
-    /** Resumo de uma lista de tempos: quantidade, média, mediana, desvio padrão, mínimo e máximo. */
-    static String resumo(List<Double> nums) {
-        if (nums.isEmpty()) return "{\"quantidade\":0}";
-        List<Double> ord = new ArrayList<>(nums);
-        Collections.sort(ord);
-        return "{\"quantidade\":" + nums.size()
-                + ",\"media\":" + num(media(nums))
-                + ",\"mediana\":" + num(percentil(ord, 0.5))
-                + ",\"desvioPadrao\":" + num(desvioPadrao(nums))
-                + ",\"minimo\":" + num(ord.get(0))
-                + ",\"maximo\":" + num(ord.get(ord.size() - 1))
-                + "}";
-    }
-
-    static String num(double n) {
-        return n == Math.rint(n) && Math.abs(n) < 1e15
-                ? String.valueOf((long) n)
-                : String.valueOf(Math.round(n * 10000) / 10000.0);
-    }
-
-    static String lista(List<Double> nums) {
-        StringJoiner j = new StringJoiner(",", "[", "]");
-        for (double n : nums) j.add(num(n));
-        return j.toString();
-    }
-
-    static String frequenciasJson(Map<Double, Integer> freq) {
-        StringJoiner j = new StringJoiner(",", "[", "]");
-        for (var e : freq.entrySet()) {
-            j.add("{\"valor\":" + num(e.getKey()) + ",\"contagem\":" + e.getValue() + "}");
-        }
-        return j.toString();
     }
 }

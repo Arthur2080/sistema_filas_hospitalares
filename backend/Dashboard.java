@@ -116,21 +116,21 @@ public class Dashboard {
             }
             porCor.add("{\"prioridade\":" + c.prioridade()
                     + ",\"pacientes\":" + freqCores.getOrDefault((double) c.prioridade(), 0)
-                    + ",\"mediaEspera\":" + (daCor.isEmpty() ? "null" : Estatistica.num(Estatistica.media(daCor)))
+                    + ",\"mediaEspera\":" + (daCor.isEmpty() ? "null" : Indicadores.num(Estatistica.media(daCor)))
                     + ",\"estourados\":" + estouradosCor + "}");
         }
 
         String json = "{"
                 + "\"quantidade\":" + esperas.size()
-                + ",\"resumo\":" + Estatistica.resumo(esperas)
-                + ",\"mediaAcumulada\":" + Estatistica.lista(Estatistica.mediaAcumulada(esperas))
+                + ",\"resumo\":" + Indicadores.resumo(esperas)
+                + ",\"mediaAcumulada\":" + Indicadores.lista(Estatistica.mediaAcumulada(esperas))
                 + ",\"situacoes\":" + situacoes
                 + ",\"comPrazo\":" + comPrazo
                 + ",\"noPrazo\":" + (comPrazo - estourados)
                 + ",\"estourados\":" + estourados
-                + ",\"percentualNoPrazo\":" + (comPrazo == 0 ? "null" : Estatistica.num(100.0 * (comPrazo - estourados) / comPrazo))
-                + ",\"percentualFastTrack\":" + Estatistica.num(100.0 * fastTrack / esperas.size())
-                + ",\"corPredominante\":" + Estatistica.lista(Estatistica.moda(freqCores))
+                + ",\"percentualNoPrazo\":" + (comPrazo == 0 ? "null" : Indicadores.num(100.0 * (comPrazo - estourados) / comPrazo))
+                + ",\"percentualFastTrack\":" + Indicadores.num(100.0 * fastTrack / esperas.size())
+                + ",\"corPredominante\":" + Indicadores.lista(Estatistica.moda(prioridades))
                 + ",\"porCor\":[" + String.join(",", porCor) + "]"
                 + "}";
         responder(ex, 200, "application/json", json.getBytes(StandardCharsets.UTF_8));
