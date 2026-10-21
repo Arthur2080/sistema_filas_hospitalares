@@ -1,11 +1,8 @@
-# Painel do Pronto-Socorro — Indicadores
+# Pronto-Atendimento — Simulador de espera
 
-Dashboard de análise estatística do Sistema de Gestão de Filas Hospitalares. Ele usa os dados de teste do banco
-(`filas_hospitalares_banco_2_dados.sql`, 06/10/2026), aplica as regras do projeto Java e mostra os indicadores
-que o documento do sistema pede: tempo porta–classificação e porta–médico, atendidos no prazo, chegadas por hora
-e quem foi embora sem atendimento.
-
-O visual segue o site de filas feito no Lovable: menu lateral, relógio simulado no topo, cartões e cores de risco.
+Dashboard que simula a espera dos pacientes de um pronto-socorro. O usuário escolhe a cor de risco, digita
+quantos pacientes estão nessa cor e quanto tempo esperaram até o médico. O Java calcula as estatísticas e
+o dashboard mostra o resultado em cartões e gráficos.
 
 ## Como rodar
 
@@ -16,51 +13,52 @@ java backend/Dashboard.java
 ```
 
 Depois abra http://localhost:8081. No VS Code, também dá para rodar o `Dashboard.java` direto pelo botão Run.
-Cada tela tem seu endereço: `#tempos`, `#prazos`, `#fluxo`, `#desfechos`, `#atendimentos` e `#simulador`
-(ex.: http://localhost:8081/#tempos).
 
-Para conferir os cálculos estatísticos com resultados feitos à mão:
+Para conferir os cálculos com resultados feitos à mão:
 
 ```
 java backend/TesteEstatistica.java
 ```
 
+## Como usar
+
+1. Clique na **cor de risco**.
+2. Digite a **quantidade de pacientes** nessa cor.
+3. Digite a **espera até o médico**, em minutos, e clique em **Adicionar** (ou tecle Enter).
+4. O dashboard envia os grupos para o Java e mostra o resultado. Repita para outras cores, ou clique em
+   **Carregar exemplo** para ver um plantão de 17 pacientes.
+
+Cada grupo vale "quantidade" pacientes com a mesma espera: 5 amarelos com 30 min viram cinco esperas de 30 min
+nas contas.
+
 ## Pastas
 
 ```
 backend/
-  Dashboard.java         servidor HTTP e o simulador (/calcular)
-  Dados.java             dados de teste, iguais aos do SQL
-  Indicadores.java       regras de negócio, indicadores (/api/painel) e montagem do JSON
-  Estatistica.java       média, mediana, desvio padrão, mínimo, máximo, frequências, moda e média acumulada
+  Dashboard.java         servidor HTTP: entrega a página e recebe os grupos em POST /calcular
+  Simulacao.java         cores de risco, regra de prazo e montagem do resultado
+  Estatistica.java       média, mediana, desvio padrão, mínimo, máximo, frequências e moda
   TesteEstatistica.java  confere os cálculos com resultados feitos à mão
-docs/
-  roteiro-apresentacao.md  explicação do Java, do HTML e comparação das três versões
-  html-gerado/             HTML de cada tela já montado, para análise
 frontend/
-  index.html         estrutura: menu, relógio e área das telas
+  index.html             estrutura da página: formulário, cartões e áreas dos gráficos
   css/style.css
-  js/graficos.js     gráficos em SVG
-  js/telas.js        conteúdo de cada tela e o histórico do atendimento
-  js/app.js          navegação, relógio simulado e simulador
+  js/graficos.js         gráficos de colunas em SVG
+  js/app.js              formulário, chamada ao Java e desenho do resultado
 ```
 
-## Telas
+## O que o Java calcula
 
-| Tela | O que mostra |
+| Indicador | Cálculo |
 |---|---|
-| Visão geral | totais por fila e situação, médias porta–classificação e porta–médico, % no prazo, evasão e alertas disparados |
-| Tempos de espera | média, mediana, desvio, menor e maior tempo de porta–classificação, porta–médico e permanência |
-| Prazos e alertas | quem aguarda consulta, com o tempo restante ou estourado, e o histórico de todos os alertas |
-| Fluxo de chegadas | chegadas por hora, horário de pico, pacientes por fila e a fila de triagem |
-| Desfechos | altas, internações, transferências e evasões, com o tempo de permanência |
-| Atendimentos | lista completa; o botão Histórico abre a linha do tempo do paciente |
-| Simulador | digite esperas por cor e veja os mesmos indicadores com as regras de prazo |
+| Pacientes | soma das quantidades |
+| Espera média, mediana, desvio padrão, menor e maior | sobre a espera de cada paciente |
+| Atendidos no prazo | pacientes com espera abaixo do tempo máximo da cor ÷ pacientes com prazo (o vermelho não tem prazo) |
+| Prazos estourados | pacientes com espera igual ou acima do tempo máximo da cor |
+| Cor predominante | moda das cores dos pacientes |
+| Fast track | % de pacientes verdes e azuis |
+| Por cor | pacientes, espera média e estourados de cada cor |
 
-O **relógio simulado** começa em 06/10/2026 10:46. Ao avançar o relógio, os prazos são verificados de novo:
-com +4 h (14:46) o alerta da Beatriz dispara, como no cenário de teste do sistema.
-
-## Regras de negócio aplicadas
+## Regras de negócio
 
 | Cor      | Prioridade | Tempo máximo | Fila       |
 |----------|------------|--------------|------------|
@@ -70,10 +68,4 @@ com +4 h (14:46) o alerta da Beatriz dispara, como no cenário de teste do siste
 | Verde    | 4          | 120 min      | Fast track |
 | Azul     | 5          | 240 min      | Fast track |
 
-- Vale a classificação mais recente; nenhuma é apagada.
-- Toda classificação, menos a vermelha, gera um alerta com o tempo máximo da cor.
-- O alerta dispara quando o relógio atinge o limite e o paciente ainda aguarda consulta (`AlertaPrazo.verificar`).
-- Filas médicas: pela prioridade da cor e, empatando, por quem chegou primeiro. Triagem: por ordem de chegada.
-- Porta–classificação: da chegada até a primeira classificação. Porta–médico: da chegada até a primeira consulta.
-- Atendidos no prazo: alertas encerrados que nunca dispararam, sobre o total de alertas encerrados.
-- Evasão: atendimentos finalizados como evasão, sobre o total de finalizados.
+O desvio padrão é populacional (divide por n): os pacientes simulados são o grupo inteiro, não uma amostra.

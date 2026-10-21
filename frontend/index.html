@@ -3,46 +3,91 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Pronto-Atendimento · Indicadores</title>
+  <title>Pronto-Atendimento · Simulador de espera</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <div class="app">
-    <nav class="lateral" aria-label="Menu principal">
-      <div class="marca"><span class="cruz" aria-hidden="true">+</span>Pronto-Atendimento</div>
-      <div class="marca-sub">Indicadores e estatísticas</div>
-      <div id="menu"></div>
-      <div class="legenda-cores" id="legenda" aria-label="Legenda das cores de risco"></div>
-    </nav>
+  <header class="topo">
+    <div class="marca"><span class="cruz" aria-hidden="true">+</span>Pronto-Atendimento</div>
+    <span class="marca-sub">Simulador de espera</span>
+  </header>
 
-    <main>
-      <header class="topo">
-        <div class="relogio" aria-live="polite"><small>Relógio simulado</small><span id="hora">–</span></div>
-        <div class="grupo" role="group" aria-label="Avançar relógio">
-          <button class="btn peq" data-avancar="15">+15 min</button>
-          <button class="btn peq" data-avancar="30">+30 min</button>
-          <button class="btn peq" data-avancar="60">+1 h</button>
-          <button class="btn peq" data-avancar="240">+4 h</button>
+  <main class="conteudo">
+    <div class="cabecalho">
+      <h1>Simulador de espera</h1>
+      <p>Escolha a cor de risco, informe quantos pacientes e quanto tempo esperaram até o médico. O Java calcula os indicadores.</p>
+    </div>
+
+    <form class="painel" id="form-sim" autocomplete="off" novalidate>
+      <fieldset class="seletor-cores">
+        <legend>1. Cor de risco</legend>
+        <button type="button" class="btn" data-cor="1" style="--sel:#b71c1c">
+          <span class="bola" style="background:#b71c1c"></span><span><b>Vermelho</b><small>imediato · Emergência</small></span>
+        </button>
+        <button type="button" class="btn" data-cor="2" style="--sel:#e8650a">
+          <span class="bola" style="background:#e8650a"></span><span><b>Laranja</b><small>até 10 min · Principal</small></span>
+        </button>
+        <button type="button" class="btn" data-cor="3" style="--sel:#d4a200">
+          <span class="bola" style="background:#d4a200"></span><span><b>Amarelo</b><small>até 60 min · Principal</small></span>
+        </button>
+        <button type="button" class="btn" data-cor="4" style="--sel:#2e7d32">
+          <span class="bola" style="background:#2e7d32"></span><span><b>Verde</b><small>até 120 min · Fast Track</small></span>
+        </button>
+        <button type="button" class="btn" data-cor="5" style="--sel:#1565c0">
+          <span class="bola" style="background:#1565c0"></span><span><b>Azul</b><small>até 240 min · Fast Track</small></span>
+        </button>
+      </fieldset>
+
+      <div class="entrada">
+        <div class="campo">
+          <label for="quantidade">2. Quantidade de pacientes</label>
+          <input id="quantidade" type="number" min="1" step="1" inputmode="numeric" placeholder="Ex: 5" required>
         </div>
-        <div class="grupo">
-          <label class="sr" for="definirHora">Definir data e hora</label>
-          <input type="datetime-local" id="definirHora">
-          <button class="btn peq" id="btnDefinir">Definir</button>
+        <div class="campo">
+          <label for="espera">3. Espera até o médico (minutos)</label>
+          <input id="espera" type="number" min="0" step="any" inputmode="decimal" placeholder="Ex: 45" required>
         </div>
-        <div class="esp"></div>
-        <button class="btn peq" id="btnReiniciar">Voltar para 10:46</button>
-      </header>
+        <button type="submit" class="btn primary">Adicionar</button>
+      </div>
 
-      <div class="conteudo" id="conteudo" tabindex="-1"></div>
-    </main>
-  </div>
+      <div class="grupos-titulo">
+        <label>Grupos de pacientes (<span id="contagem">0 pacientes</span>)</label>
+        <div class="acoes">
+          <button type="button" class="btn peq" id="exemplo">Carregar exemplo</button>
+          <button type="button" class="btn peq perigo" id="limpar">Limpar</button>
+        </div>
+      </div>
+      <ul class="chips" id="grupos"></ul>
+      <p class="dica">Clique em um grupo para removê-lo.</p>
+    </form>
 
-  <dialog id="modal" aria-labelledby="mtitulo"></dialog>
+    <section class="cards" id="kpis" aria-live="polite"></section>
+
+    <section class="painel">
+      <h2>Espera de cada grupo
+        <span class="legenda"><span><i class="linha"></i>Tempo máximo da cor</span><span><i class="linha tracejada"></i>Média</span></span>
+      </h2>
+      <div id="g-grupos" class="grafico"></div>
+    </section>
+
+    <div class="grade-2">
+      <section class="painel">
+        <h2>Pacientes por cor</h2>
+        <div id="g-pacientes" class="grafico"></div>
+      </section>
+      <section class="painel">
+        <h2>Espera média por cor
+          <span class="legenda"><span><i class="linha"></i>Tempo máximo da cor</span></span>
+        </h2>
+        <div id="g-media-cor" class="grafico"></div>
+      </section>
+    </div>
+  </main>
+
   <div id="toasts" aria-live="polite" role="status"></div>
   <div id="tip" class="tip" hidden></div>
 
   <script src="js/graficos.js"></script>
-  <script src="js/telas.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

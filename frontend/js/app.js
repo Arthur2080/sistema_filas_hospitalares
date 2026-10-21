@@ -1,242 +1,169 @@
 /* =========================================================================
-   Estado, navegação, relógio simulado e eventos.
+   Simulador: o usuário escolhe a cor, digita a quantidade de pacientes e a
+   espera; o Java (/calcular) faz as contas e a tela mostra o resultado.
    ========================================================================= */
 
 const $ = id => document.getElementById(id);
-const RELOGIO_INICIAL = "2026-10-06T10:46";
-const ESPERA_DIGITACAO = 900;
+const NOME_COR = { 1: "Vermelho", 2: "Laranja", 3: "Amarelo", 4: "Verde", 5: "Azul" };
 
-let dados = null;
-let agora = RELOGIO_INICIAL;
-// A tela atual fica no endereço (ex.: #tempos), para abrir uma tela direto pelo link.
-let tela = Object.hasOwn(TELAS, location.hash.slice(1)) ? location.hash.slice(1) : "visao";
-const sim = { cor: 3, pacientes: [], dados: {}, timer: null, pedido: 0 };
+// grupos: [{ cor, quantidade, espera }] · dados: resposta do Java · pedido: descarta respostas antigas
+const sim = { cor: 3, grupos: [], dados: null, pedido: 0 };
 
-const ICONES = {
-  visao: "M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z",
-  tempos: "M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0",
-  prazos: "M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10 21h4",
-  fluxo: "M3 20h18M6 16v-5M11 16V6M16 16v-8",
-  desfechos: "M10 17l5-5-5-5M15 12H3M21 3v18",
-  atendimentos: "M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01",
-  simulador: "M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"
-};
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const kpi = (valor, texto, classe = "", sub = "") =>
+  `<div class="kpi ${classe}"><b>${valor}</b><span>${texto}</span>${sub ? `<small>${sub}</small>` : ""}</div>`;
+const totalPacientes = () => sim.grupos.reduce((soma, g) => soma + g.quantidade, 0);
 
-// Data local no formato do input datetime-local: 2026-10-06T10:46
-function isoLocal(d) {
-  return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}T${p2(d.getHours())}:${p2(d.getMinutes())}`;
-}
-
-const disparados = () => dados ? dados.alertas.filter(a => a.status === "DISPARADO").length : 0;
-
-async function carregar(novoAgora, avisar = false) {
-  const antes = disparados();
-  try {
-    const resp = await fetch(`/api/painel?agora=${encodeURIComponent(novoAgora)}`);
-    const json = await resp.json();
-    if (!resp.ok) return toast(json.erro, "erro");
-    dados = json;
-    agora = json.agora;
-    CORES = json.cores;
-  } catch {
-    return toast("Não foi possível falar com o servidor. Ele está rodando?", "erro");
-  }
-  render();
-  const novos = disparados() - antes;
-  if (avisar && novos > 0) toast(`${vezes(novos, "alerta de prazo disparado", "alertas de prazo disparados")}!`, "erro");
-}
-
-function render() {
-  $("hora").textContent = fmtDH(agora);
-  $("definirHora").value = agora;
-
-  let grupo = "";
-  $("menu").innerHTML = Object.entries(TELAS).map(([k, t]) => {
-    const cabeca = t.grupo !== grupo ? `<div class="grupo-menu">${(grupo = t.grupo)}</div>` : "";
-    const contador = k === "prazos" && disparados() ? `<span class="contador" aria-label="alertas disparados">${disparados()}</span>` : "";
-    return `${cabeca}<button data-tela="${k}" ${tela === k ? 'aria-current="page"' : ""}>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${ICONES[k]}"/></svg>
-      ${t.titulo}${contador}</button>`;
-  }).join("");
-
-  $("legenda").innerHTML = "<strong>Cores de risco</strong>" + CORES.map(c =>
-    `<div><span class="cor c${c.prioridade}">${esc(c.nome)}</span><small>${c.tempoMax ? `até ${c.tempoMax} min` : "imediato"}</small></div>`).join("");
-
-  $("conteudo").innerHTML = TELAS[tela].html(dados);
-  if (tela === "simulador") {
-    marcarCorSimulador();
-    desenharListaSim();
-  }
-  desenharGraficos();
-}
-
-function desenharGraficos() {
-  TELAS[tela].graficos?.(dados);
-}
-
-function irPara(novaTela) {
-  tela = novaTela;
-  history.replaceState(null, "", "#" + novaTela);
-  render();
-  $("conteudo").focus();
-  scrollTo(0, 0);
-}
-
-function mudarRelogio(novo) {
-  carregar(novo, true);
-}
-
-/* ------------------------------------------------------------------ modal e avisos */
-
-function toast(msg, tipo = "ok") {
+function toast(msg) {
   const t = document.createElement("div");
-  t.className = "toast " + tipo;
+  t.className = "toast erro";
   t.textContent = msg;
   $("toasts").appendChild(t);
   setTimeout(() => t.remove(), 4500);
 }
 
-function abrirHistorico(id) {
-  const a = atendimentoPorId(dados, id);
-  const dlg = $("modal");
-  dlg.innerHTML = `<header><h2 id="mtitulo">Histórico — <span class="senha">${esc(a.senha)}</span> · ${esc(a.paciente)}</h2>
-    <button type="button" class="x" data-fechar aria-label="Fechar">×</button></header>
-    <div class="mcorpo">${htmlHistorico(a, dados)}</div>`;
-  dlg.showModal();
+/* ------------------------------------------------------------------ entrada */
+
+function marcarCor() {
+  document.querySelectorAll("[data-cor]").forEach(b => b.setAttribute("aria-pressed", Number(b.dataset.cor) === sim.cor));
 }
 
-/* ------------------------------------------------------------------ simulador */
-
-function lerEspera(texto) {
-  texto = texto.trim().replace(",", ".");
-  if (texto === "") return null;
-  const n = Number(texto);
-  return Number.isFinite(n) && n >= 0 ? n : NaN;
+function lerNumero(input, minimo, inteiro) {
+  const n = Number(input.value.replace(",", "."));
+  const ok = input.value.trim() !== "" && Number.isFinite(n) && n >= minimo && (!inteiro || Number.isInteger(n));
+  input.classList.toggle("invalido", !ok);
+  return ok ? n : null;
 }
 
-function marcarCorSimulador() {
-  document.querySelectorAll("[data-sim-cor]").forEach(b =>
-    b.setAttribute("aria-pressed", Number(b.dataset.simCor) === sim.cor));
+function adicionarGrupo() {
+  const quantidade = lerNumero($("quantidade"), 1, true);
+  const espera = lerNumero($("espera"), 0, false);
+  if (quantidade === null) return toast("Digite a quantidade de pacientes: um número inteiro a partir de 1.");
+  if (espera === null) return toast("Digite a espera em minutos: um número a partir de 0.");
+
+  sim.grupos.push({ cor: sim.cor, quantidade, espera });
+  $("quantidade").value = "";
+  $("espera").value = "";
+  $("quantidade").focus();
+  calcular();
 }
 
-function desenharListaSim(destacarUltimo = false) {
-  const lista = $("sim-lista");
-  if (!lista) return;
-  $("sim-contagem").textContent = sim.pacientes.length;
-  lista.innerHTML = sim.pacientes.map((p, i) => `
-    <button class="btn chip ${destacarUltimo && i === sim.pacientes.length - 1 ? "novo" : ""}" data-sim-remover="${i}">
-      <span class="bola" style="background:${COR_RISCO[p.cor]}"></span>${duracao(p.espera)}</button>`).join("");
-  marcarChips();
+// Exemplo fixo de um plantão (17 pacientes), para conferir os resultados à mão.
+function carregarExemplo() {
+  sim.grupos = [
+    { cor: 1, quantidade: 1, espera: 0 },
+    { cor: 2, quantidade: 2, espera: 8 },
+    { cor: 3, quantidade: 5, espera: 30 },
+    { cor: 3, quantidade: 2, espera: 75 },
+    { cor: 4, quantidade: 4, espera: 90 },
+    { cor: 4, quantidade: 1, espera: 150 },
+    { cor: 5, quantidade: 2, espera: 100 }
+  ];
+  calcular();
 }
 
-async function atualizarSimulador(destacarUltimo = false) {
-  desenharListaSim(destacarUltimo);
+/* ------------------------------------------------------------------ cálculo no Java */
+
+async function calcular() {
   const pedido = ++sim.pedido;
-  if (!sim.pacientes.length) {
-    sim.dados = {};
-    return desenharSimulador();
+  sim.dados = null;
+  if (sim.grupos.length) {
+    try {
+      // Cada grupo vai como "prioridade:quantidade:espera", separados por vírgula.
+      const corpo = sim.grupos.map(g => `${g.cor}:${g.quantidade}:${g.espera}`).join(",");
+      const resp = await fetch("/calcular", { method: "POST", body: corpo });
+      const json = await resp.json();
+      if (pedido !== sim.pedido) return;
+      if (resp.ok) sim.dados = json;
+      else toast(json.erro);
+    } catch {
+      if (pedido !== sim.pedido) return;
+      toast("Não foi possível falar com o servidor. Ele está rodando?");
+    }
   }
-  const resp = await fetch("/calcular", { method: "POST", body: sim.pacientes.map(p => `${p.cor}:${p.espera}`).join(",") });
-  const json = await resp.json();
-  if (pedido !== sim.pedido) return;
-  if (!resp.ok) toast(json.erro, "erro");
-  sim.dados = resp.ok ? json : {};
-  desenharSimulador();
+  desenhar();
 }
 
-function agendarSim() {
-  const input = $("sim-espera"), barra = $("sim-progresso");
-  clearTimeout(sim.timer);
-  barra.classList.remove("ativa");
-  void barra.offsetWidth;
+/* ------------------------------------------------------------------ resultado */
 
-  const n = lerEspera(input.value);
-  input.classList.toggle("invalido", Number.isNaN(n));
-  if (!Number.isFinite(n)) return;
-  barra.classList.add("ativa");
-  sim.timer = setTimeout(salvarSim, ESPERA_DIGITACAO);
+function textoSituacao(g, situacao, tempoMax) {
+  if (situacao === "IMEDIATO") return "atendimento imediato, sem fila";
+  if (situacao === "ESTOURADO") return `prazo de ${duracao(tempoMax)} estourado (+${duracao(g.espera - tempoMax)})`;
+  return `dentro do prazo de ${duracao(tempoMax)}`;
 }
 
-function salvarSim() {
-  const input = $("sim-espera");
-  clearTimeout(sim.timer);
-  $("sim-progresso").classList.remove("ativa");
-  const n = lerEspera(input.value);
-  if (!Number.isFinite(n)) return;
-  sim.pacientes.push({ cor: sim.cor, espera: n });
-  input.value = "";
-  atualizarSimulador(true);
-}
+function desenhar() {
+  const r = sim.dados;
+  const tempoMax = p => r.porCor.find(c => c.prioridade === p).tempoMax;
 
-// Simula um plantão: poucos vermelhos, maioria amarelo e verde, e parte das esperas passando do prazo.
-function plantaoExemplo() {
-  const sorteio = [1, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5];
-  sim.pacientes = Array.from({ length: 20 }, () => {
-    const cor = corDe(sorteio[Math.floor(Math.random() * sorteio.length)]);
-    const espera = cor.tempoMax === 0 ? Math.floor(Math.random() * 3) : Math.round(cor.tempoMax * (0.2 + Math.random() * 1.1));
-    return { cor: cor.prioridade, espera };
+  $("contagem").textContent = vezes(totalPacientes(), "paciente", "pacientes");
+  $("grupos").innerHTML = sim.grupos.map((g, i) => {
+    const s = r ? r.situacoes[i] : "";
+    const titulo = `${NOME_COR[g.cor]}: ${vezes(g.quantidade, "paciente", "pacientes")} com ${duracao(g.espera)}` +
+                   (s ? `, ${textoSituacao(g, s, tempoMax(g.cor))}` : "") + ". Clique para remover.";
+    return `<li><button type="button" class="btn chip ${s === "ESTOURADO" ? "estourado" : ""}" data-remover="${i}" title="${esc(titulo)}">
+      <span class="bola" style="background:${COR_RISCO[g.cor]}"></span>${NOME_COR[g.cor]} · ${vezes(g.quantidade, "paciente", "pacientes")} · ${duracao(g.espera)}</button></li>`;
+  }).join("");
+
+  const graficos = ["g-grupos", "g-pacientes", "g-media-cor"].map($);
+  if (!r) {
+    $("kpis").innerHTML = "";
+    graficos.forEach(el => vazio(el, "Adicione pacientes para ver o gráfico"));
+    return;
+  }
+
+  $("kpis").innerHTML = `
+    ${kpi(r.pacientes, "Pacientes", "", vezes(sim.grupos.length, "grupo", "grupos"))}
+    ${kpi(duracao(r.media), "Espera média")}
+    ${kpi(duracao(r.mediana), "Mediana")}
+    ${kpi(duracao(r.desvioPadrao), "Desvio padrão", "neutra")}
+    ${kpi(duracao(r.minimo), "Menor espera", "neutra")}
+    ${kpi(duracao(r.maximo), "Maior espera", "neutra")}
+    ${kpi(pct(r.percentualNoPrazo), "Atendidos no prazo", "verde sucesso", r.comPrazo ? `${r.noPrazo} de ${r.comPrazo} com prazo` : "só vermelhos")}
+    ${kpi(r.estourados, "Prazos estourados", r.estourados ? "vermelho alerta" : "verde", "pacientes além do tempo máximo")}
+    ${kpi(r.corPredominante.length ? r.corPredominante.map(p => NOME_COR[p]).join(", ") : "Nenhuma", "Cor predominante", "azul", "moda das cores")}
+    ${kpi(pct(r.percentualFastTrack), "Fast track", "verde", "verdes e azuis")}`;
+
+  colunas(graficos[0], sim.grupos.map((g, i) => ({ ...g, i })), {
+    valor: g => g.espera, cor: g => COR_RISCO[g.cor], eixo: g => `${g.i + 1}º`, media: r.media,
+    rotulo: g => `${g.quantidade}×`, prazo: g => tempoMax(g.cor),
+    tip: g => esc(`${g.i + 1}º grupo · ${NOME_COR[g.cor]}: ${vezes(g.quantidade, "paciente", "pacientes")} com ${duracao(g.espera)}, ${textoSituacao(g, r.situacoes[g.i], tempoMax(g.cor))}`)
   });
-  atualizarSimulador();
+  colunas(graficos[1], r.porCor, {
+    valor: c => c.pacientes, cor: c => COR_RISCO[c.prioridade], eixo: c => c.nome, inteiro: true,
+    rotulo: c => c.pacientes,
+    tip: c => esc(`${c.nome}: ${vezes(c.pacientes, "paciente", "pacientes")}`)
+  });
+  colunas(graficos[2], r.porCor.filter(c => c.pacientes > 0), {
+    valor: c => c.mediaEspera, cor: c => COR_RISCO[c.prioridade], eixo: c => c.nome,
+    rotulo: c => fmt(c.mediaEspera), prazo: c => c.tempoMax,
+    tip: c => esc(`${c.nome}: média ${duracao(c.mediaEspera)} · ${c.estourados} de ${vezes(c.pacientes, "paciente estourou", "pacientes estouraram")} o prazo`)
+  });
 }
 
 /* ------------------------------------------------------------------ eventos */
 
+$("form-sim").addEventListener("submit", e => {
+  e.preventDefault();
+  adicionarGrupo();
+});
+
 document.addEventListener("click", e => {
-  const alvo = e.target.closest("[data-tela],[data-historico],[data-fechar],[data-avancar],[data-sim-cor],[data-sim-remover],#sim-exemplo,#sim-limpar");
-  if (!alvo) {
-    if (e.target === $("modal")) $("modal").close();
-    return;
-  }
-  const ds = alvo.dataset;
-  if (ds.tela) irPara(ds.tela);
-  else if (ds.historico) abrirHistorico(Number(ds.historico));
-  else if ("fechar" in ds) $("modal").close();
-  else if (ds.avancar) mudarRelogio(isoLocal(new Date(data(agora).getTime() + Number(ds.avancar) * 60000)));
-  else if (ds.simCor) {
-    sim.cor = Number(ds.simCor);
-    marcarCorSimulador();
-    $("sim-espera").focus();
-  } else if (ds.simRemover) {
-    sim.pacientes.splice(Number(ds.simRemover), 1);
-    atualizarSimulador();
-  } else if (alvo.id === "sim-exemplo") plantaoExemplo();
-  else if (alvo.id === "sim-limpar") {
-    sim.pacientes = [];
-    $("sim-espera").value = "";
-    agendarSim();
-    atualizarSimulador();
+  const alvo = e.target.closest("[data-cor],[data-remover],#exemplo,#limpar");
+  if (!alvo) return;
+  if (alvo.dataset.cor) {
+    sim.cor = Number(alvo.dataset.cor);
+    marcarCor();
+    $("quantidade").focus();
+  } else if (alvo.dataset.remover) {
+    sim.grupos.splice(Number(alvo.dataset.remover), 1);
+    calcular();
+  } else if (alvo.id === "exemplo") carregarExemplo();
+  else if (alvo.id === "limpar") {
+    sim.grupos = [];
+    calcular();
   }
 });
-
-document.addEventListener("input", e => {
-  if (e.target.id !== "sim-espera") return;
-  const input = e.target, partes = input.value.split(/[\s;]+/);
-  if (partes.length > 1) {
-    const ultimo = partes.pop();
-    partes.map(lerEspera).filter(Number.isFinite).forEach(n => sim.pacientes.push({ cor: sim.cor, espera: n }));
-    input.value = ultimo;
-    atualizarSimulador();
-  }
-  agendarSim();
-});
-
-document.addEventListener("keydown", e => {
-  if (e.target.id === "sim-espera" && e.key === "Enter") salvarSim();
-});
-
-document.addEventListener("change", e => {
-  if (e.target.id === "filtroAlerta") ui.filtroAlerta = e.target.value;
-  else if (e.target.id === "filtroStatus") ui.filtroStatus = e.target.value;
-  else return;
-  render();
-});
-
-$("btnDefinir").onclick = () => {
-  const v = $("definirHora").value;
-  if (!v) return toast("Informe data e hora.", "erro");
-  mudarRelogio(v);
-};
-$("btnReiniciar").onclick = () => carregar(RELOGIO_INICIAL);
 
 const tip = $("tip");
 document.addEventListener("mousemove", e => {
@@ -254,7 +181,8 @@ document.addEventListener("mousemove", e => {
 let quadro;
 addEventListener("resize", () => {
   cancelAnimationFrame(quadro);
-  quadro = requestAnimationFrame(() => dados && desenharGraficos());
+  quadro = requestAnimationFrame(desenhar);
 });
 
-carregar(RELOGIO_INICIAL);
+marcarCor();
+desenhar();

@@ -2,10 +2,10 @@ import java.util.*;
 
 /**
  * Cálculos estatísticos do dashboard: soma, média, mediana, desvio padrão, mínimo, máximo,
- * frequências, moda e média acumulada.
+ * frequências e moda.
  *
- * Os dados são tempos de espera em minutos (ex.: da chegada até o médico) ou números que
- * representam categorias (a prioridade da cor de risco, a hora de chegada).
+ * Os dados são tempos de espera em minutos (da chegada até o médico) ou números que
+ * representam categorias (a prioridade da cor de risco).
  * Toda lista recebida precisa ter pelo menos um valor; quem chama confere isso antes.
  */
 public class Estatistica {
@@ -45,8 +45,8 @@ public class Estatistica {
      * 1) calcula a média; 2) soma o quadrado da distância de cada valor até a média;
      * 3) divide pela quantidade (variância); 4) tira a raiz quadrada.
      *
-     * Divide por n (e não por n - 1) porque os dados são todos os atendimentos do dia,
-     * a população inteira, e não uma amostra dela.
+     * Divide por n (e não por n - 1) porque os pacientes simulados são o grupo inteiro
+     * (a população), e não uma amostra dela.
      */
     static double desvioPadrao(List<Double> nums) {
         double m = media(nums);
@@ -111,19 +111,5 @@ public class Estatistica {
             if (freq.get(valor) == maiorFrequencia) modas.add(valor);
         }
         return modas;
-    }
-
-    /**
-     * Média acumulada: a média de cada valor somado aos anteriores, na ordem da lista.
-     * Ex.: [10, 20, 60] → [10, 15, 30]. Mostra como a média evolui ao longo do dia.
-     */
-    static List<Double> mediaAcumulada(List<Double> nums) {
-        List<Double> medias = new ArrayList<>();
-        double total = 0;
-        for (int i = 0; i < nums.size(); i++) {
-            total = total + nums.get(i);
-            medias.add(total / (i + 1));
-        }
-        return medias;
     }
 }

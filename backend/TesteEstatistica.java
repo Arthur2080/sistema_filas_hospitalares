@@ -5,8 +5,8 @@ import java.util.List;
  *
  *   java backend/TesteEstatistica.java
  *
- * Os dados principais são os tempos porta–médico (minutos) dos dados de teste, na ordem dos atendimentos:
- *   A001 08:00 → 09:26 = 86 | A002 08:06 → 08:10 = 4 | A004 09:02 → 09:51 = 49 | A007 10:31 → 10:35 = 4
+ * Os primeiros casos usam quatro esperas até o médico, em minutos: 86, 4, 49 e 4.
+ * Os últimos usam o simulador, com grupos de pacientes (cor, quantidade e espera).
  */
 public class TesteEstatistica {
 
@@ -27,8 +27,6 @@ public class TesteEstatistica {
         conferir("máximo", Estatistica.maximo(portaMedico), 86);
         // o 4 aparece duas vezes, os outros uma
         conferir("moda", Estatistica.moda(portaMedico), List.of(4.0));
-        // 86 | (86+4)/2 = 45 | (90+49)/3 = 46,33 | 143/4 = 35,75
-        conferir("média acumulada", Estatistica.mediaAcumulada(portaMedico), List.of(86.0, 45.0, 139.0 / 3, 35.75));
 
         // Casos de borda
         conferir("mediana (quantidade ímpar)", Estatistica.mediana(List.of(30.0, 10.0, 20.0)), 20);
@@ -38,6 +36,23 @@ public class TesteEstatistica {
         conferir("moda (empate = bimodal)", Estatistica.moda(List.of(2.0, 2.0, 4.0, 4.0, 5.0)), List.of(2.0, 4.0));
         // prioridades das cores atuais: amarelo (3) aparece mais
         conferir("moda das cores", Estatistica.moda(List.of(3.0, 4.0, 3.0, 2.0, 3.0)), List.of(3.0));
+
+        // Simulador: 5 amarelos que esperaram 30 min + 3 verdes que esperaram 150 min = 8 pacientes
+        List<Simulacao.Grupo> grupos = List.of(
+                new Simulacao.Grupo(Simulacao.corPorPrioridade(3), 5, 30),
+                new Simulacao.Grupo(Simulacao.corPorPrioridade(4), 3, 150));
+        List<Double> esperas = Simulacao.esperasDosPacientes(grupos);
+        conferir("grupos viram 8 pacientes", esperas, List.of(30.0, 30.0, 30.0, 30.0, 30.0, 150.0, 150.0, 150.0));
+        // (5 × 30 + 3 × 150) / 8 = 600 / 8 = 75
+        conferir("média com quantidade", Estatistica.media(esperas), 75);
+        // 4º e 5º valores da lista ordenada: (30 + 30) / 2 = 30
+        conferir("mediana com quantidade", Estatistica.mediana(esperas), 30);
+        // 5 × (30 − 75)² + 3 × (150 − 75)² = 10125 + 16875 = 27000 → variância 27000 / 8 = 3375
+        conferir("desvio com quantidade", Estatistica.desvioPadrao(esperas), Math.sqrt(3375));
+        conferir("cor predominante (amarelo)", Estatistica.moda(Simulacao.prioridadesDosPacientes(grupos)), List.of(3.0));
+        // verde: 150 min passa do máximo de 120 min; amarelo: 30 min está dentro dos 60 min
+        conferir("verde com 150 min estourou", Simulacao.estourouPrazo(Simulacao.corPorPrioridade(4), 150) ? 1 : 0, 1);
+        conferir("amarelo com 30 min no prazo", Simulacao.estourouPrazo(Simulacao.corPorPrioridade(3), 30) ? 1 : 0, 0);
 
         System.out.println();
         System.out.println(falhas == 0 ? "Todos os cálculos conferem." : falhas + " cálculo(s) com resultado errado.");
