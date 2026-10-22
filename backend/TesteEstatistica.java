@@ -51,6 +51,13 @@ public class TesteEstatistica {
         conferir("pacientes estourados (3 verdes)", simulacao.getPacientesEstourados(), 3);
         conferir("pacientes com prazo", simulacao.getPacientesComPrazo(), 8);
         conferir("pacientes no fast track", simulacao.getPacientesFastTrack(), 3);
+        conferir("pacientes na fila principal", simulacao.getPacientesNaFila("Principal"), 5);
+        // faixas: 0-15 | 15-30 | 30-60 | 60-120 | 120-240 | 240+
+        // 30 min fica em "30 a 60" (o limite 30 já foi atingido); 150 min fica em "120 a 240"
+        int[] faixas = simulacao.getPacientesPorFaixa();
+        conferir("faixa 30 a 60 min (5 amarelos)", faixas[2], 5);
+        conferir("faixa 120 a 240 min (3 verdes)", faixas[4], 3);
+        conferir("faixas somam 8 pacientes", faixas[0] + faixas[1] + faixas[2] + faixas[3] + faixas[4] + faixas[5], 8);
 
         System.out.println();
         if (falhas == 0) {

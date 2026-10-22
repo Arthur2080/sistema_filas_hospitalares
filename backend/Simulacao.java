@@ -101,13 +101,52 @@ public class Simulacao {
     }
 
     public int getPacientesFastTrack() {
+        return getPacientesNaFila("Fast Track");
+    }
+
+    public int getPacientesNaFila(String fila) {
         int total = 0;
         for (GrupoPacientes grupo : grupos) {
-            if (grupo.getCor().getFila().equals("Fast Track")) {
+            if (grupo.getCor().getFila().equals(fila)) {
                 total = total + grupo.getQuantidade();
             }
         }
         return total;
+    }
+
+    // ---------------------------------------------------------------- faixas de espera
+
+    // Limites das faixas, em minutos: 0 a 15, 15 a 30, 30 a 60, 60 a 120, 120 a 240 e 240 ou mais.
+    private static final int[] LIMITES_FAIXAS = {15, 30, 60, 120, 240};
+
+    public static String[] getNomesFaixas() {
+        String[] nomes = new String[LIMITES_FAIXAS.length + 1];
+        int inicio = 0;
+        for (int i = 0; i < LIMITES_FAIXAS.length; i++) {
+            nomes[i] = inicio + " a " + LIMITES_FAIXAS[i] + " min";
+            inicio = LIMITES_FAIXAS[i];
+        }
+        nomes[LIMITES_FAIXAS.length] = inicio + " min ou mais";
+        return nomes;
+    }
+
+    /**
+     * Distribuição de frequências: quantos pacientes esperaram em cada faixa de tempo.
+     * Cada espera entra na primeira faixa cujo limite ela não atinge. Ex.: 30 min fica em "30 a 60 min".
+     */
+    public int[] getPacientesPorFaixa() {
+        int[] contagem = new int[LIMITES_FAIXAS.length + 1];
+        for (double espera : getEsperas()) {
+            int faixa = LIMITES_FAIXAS.length; // última faixa: "240 min ou mais"
+            for (int i = 0; i < LIMITES_FAIXAS.length; i++) {
+                if (espera < LIMITES_FAIXAS[i]) {
+                    faixa = i;
+                    break;
+                }
+            }
+            contagem[faixa]++;
+        }
+        return contagem;
     }
 
     // ---------------------------------------------------------------- resultado em JSON
@@ -175,6 +214,27 @@ public class Simulacao {
             }
             json.append(",\"estourados\":").append(getPacientesEstourados(cor));
             json.append("}");
+        }
+        json.append("]");
+
+        // Pacientes em cada fila de atendimento.
+        String[] filas = {"Emergência", "Principal", "Fast Track"};
+        json.append(",\"porFila\":[");
+        for (int i = 0; i < filas.length; i++) {
+            if (i > 0) json.append(",");
+            json.append("{\"fila\":\"").append(filas[i]).append("\"");
+            json.append(",\"pacientes\":").append(getPacientesNaFila(filas[i])).append("}");
+        }
+        json.append("]");
+
+        // Quantos pacientes em cada faixa de espera.
+        String[] nomesFaixas = getNomesFaixas();
+        int[] pacientesPorFaixa = getPacientesPorFaixa();
+        json.append(",\"faixasEspera\":[");
+        for (int i = 0; i < nomesFaixas.length; i++) {
+            if (i > 0) json.append(",");
+            json.append("{\"faixa\":\"").append(nomesFaixas[i]).append("\"");
+            json.append(",\"pacientes\":").append(pacientesPorFaixa[i]).append("}");
         }
         json.append("]");
 

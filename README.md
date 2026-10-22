@@ -69,6 +69,21 @@ frontend/
 | Cor predominante | moda das cores dos pacientes |
 | Fast track | % de pacientes verdes e azuis |
 | Por cor | pacientes, espera média e estourados de cada cor |
+| Por fila | pacientes na Emergência, na Principal e no Fast Track |
+| Faixas de espera | distribuição de frequências: pacientes que esperaram 0 a 15, 15 a 30, 30 a 60, 60 a 120, 120 a 240 e 240 min ou mais |
+
+## Gráficos
+
+| Gráfico | Tipo |
+|---|---|
+| Pacientes por cor | colunas |
+| Espera média por cor | colunas com a linha do tempo máximo da cor |
+| Pacientes por fila | rosca (`conic-gradient` do CSS) |
+| Situação dos pacientes | barra empilhada: no prazo, estourados e imediatos |
+| Distribuição das esperas | barras horizontais (histograma por faixa) |
+| Resumo das esperas | régua com menor espera, mediana, média e maior espera |
+
+Todos são feitos com `<div>` e CSS, sem biblioteca de gráficos.
 
 ## Regras de negócio
 

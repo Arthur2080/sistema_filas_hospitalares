@@ -222,13 +222,24 @@ function coluna(nome, texto, altura, cor, limite) {
 }
 
 function mostrarGraficos() {
-  const graficoPacientes = document.getElementById("grafico-pacientes");
-  const graficoEspera = document.getElementById("grafico-espera");
+  const idsGraficos = ["grafico-pacientes", "grafico-espera", "grafico-filas", "grafico-situacao", "grafico-faixas", "grafico-resumo"];
   if (resultado === null) {
-    graficoPacientes.innerHTML = `<p class="vazio">Adicione pacientes para ver o gráfico</p>`;
-    graficoEspera.innerHTML = `<p class="vazio">Adicione pacientes para ver o gráfico</p>`;
+    for (const id of idsGraficos) {
+      document.getElementById(id).innerHTML = `<p class="vazio">Adicione pacientes para ver o gráfico</p>`;
+    }
     return;
   }
+  mostrarGraficoColunas();
+  mostrarGraficoFilas();
+  mostrarGraficoSituacao();
+  mostrarGraficoFaixas();
+  mostrarGraficoResumo();
+}
+
+// Dois gráficos de colunas: pacientes por cor e espera média por cor.
+function mostrarGraficoColunas() {
+  const graficoPacientes = document.getElementById("grafico-pacientes");
+  const graficoEspera = document.getElementById("grafico-espera");
 
   // Pacientes por cor: a coluna mais alta é a cor com mais pacientes.
   let maiorQuantidade = 1;
@@ -259,6 +270,110 @@ function mostrarGraficos() {
     }
   }
   graficoEspera.innerHTML = html;
+}
+
+// Uma linha de legenda: bolinha colorida, nome e valor.
+function itemLegenda(cor, nome, valor) {
+  return `<li><span class="bola" style="background:${cor}"></span>${nome}<b>${valor}</b></li>`;
+}
+
+// Gráfico de rosca: cada fila ocupa uma fatia proporcional aos seus pacientes.
+// O CSS conic-gradient pinta as fatias: "cor início% fim%" para cada uma.
+function mostrarGraficoFilas() {
+  const COR_FILA = { "Emergência": "#b71c1c", "Principal": "#e8650a", "Fast Track": "#2e7d32" };
+  const fatias = [];
+  let legenda = "";
+  let inicio = 0;
+  for (const f of resultado.porFila) {
+    const percentual = f.pacientes / resultado.pacientes * 100;
+    const fim = inicio + percentual;
+    fatias.push(COR_FILA[f.fila] + " " + inicio + "% " + fim + "%");
+    legenda += itemLegenda(COR_FILA[f.fila], f.fila, textoPacientes(f.pacientes) + " · " + formatarPercentual(percentual));
+    inicio = fim;
+  }
+  document.getElementById("grafico-filas").innerHTML = `
+    <div class="rosca-area">
+      <div class="rosca" style="background: conic-gradient(${fatias.join(", ")})">
+        <span><b>${resultado.pacientes}</b>pacientes</span>
+      </div>
+      <ul class="legenda-lista">${legenda}</ul>
+    </div>`;
+}
+
+// Barra empilhada: uma barra só, dividida entre no prazo, estourados e imediatos (vermelhos, sem prazo).
+function mostrarGraficoSituacao() {
+  const partes = [
+    { nome: "No prazo", valor: resultado.noPrazo, cor: "#2e7d32" },
+    { nome: "Prazo estourado", valor: resultado.estourados, cor: "#b42318" },
+    { nome: "Imediato (vermelho, sem prazo)", valor: resultado.pacientes - resultado.comPrazo, cor: "#6b7785" }
+  ];
+  let barra = "";
+  let legenda = "";
+  for (const parte of partes) {
+    const percentual = parte.valor / resultado.pacientes * 100;
+    if (parte.valor > 0) {
+      let texto = "";
+      if (percentual >= 10) {
+        texto = formatarPercentual(percentual); // só escreve dentro do pedaço se couber
+      }
+      barra += `<div style="width:${percentual}%; background:${parte.cor}">${texto}</div>`;
+    }
+    legenda += itemLegenda(parte.cor, parte.nome, textoPacientes(parte.valor) + " · " + formatarPercentual(percentual));
+  }
+  document.getElementById("grafico-situacao").innerHTML = `
+    <div class="empilhada">${barra}</div>
+    <ul class="legenda-lista">${legenda}</ul>`;
+}
+
+// Barras horizontais: quantos pacientes em cada faixa de espera (distribuição de frequências).
+function mostrarGraficoFaixas() {
+  let maior = 1;
+  for (const f of resultado.faixasEspera) {
+    maior = Math.max(maior, f.pacientes);
+  }
+  let html = "";
+  for (const f of resultado.faixasEspera) {
+    html += `<div class="linha-barra">
+      <span>${f.faixa}</span>
+      <div class="trilho"><div style="width:${f.pacientes / maior * 100}%"></div></div>
+      <b>${f.pacientes}</b>
+    </div>`;
+  }
+  document.getElementById("grafico-faixas").innerHTML = html;
+}
+
+// Régua de 0 até a maior espera: a faixa cinza vai da menor à maior espera,
+// e as marcas mostram onde ficam a mediana e a média.
+function mostrarGraficoResumo() {
+  let escala = resultado.maximo;
+  if (escala === 0) {
+    escala = 1;
+  }
+  function posicao(valor) {
+    return valor / escala * 100;
+  }
+
+  let observacao = "A média e a mediana são iguais: as esperas estão equilibradas.";
+  if (resultado.media > resultado.mediana) {
+    observacao = "A média está acima da mediana: algumas esperas longas puxam a média para cima.";
+  } else if (resultado.media < resultado.mediana) {
+    observacao = "A média está abaixo da mediana: algumas esperas curtas puxam a média para baixo.";
+  }
+
+  document.getElementById("grafico-resumo").innerHTML = `
+    <div class="regua">
+      <div class="regua-faixa" style="left:${posicao(resultado.minimo)}%; width:${posicao(resultado.maximo - resultado.minimo)}%"></div>
+      <div class="marcador mediana" style="left:${posicao(resultado.mediana)}%"></div>
+      <div class="marcador media" style="left:${posicao(resultado.media)}%"></div>
+    </div>
+    <div class="regua-eixo"><span>0 min</span><span>${formatarMinutos(resultado.maximo)}</span></div>
+    <ul class="legenda-lista">
+      ${itemLegenda("#b9c5d0", "Menor espera", formatarMinutos(resultado.minimo))}
+      ${itemLegenda("#6a1b9a", "Mediana", formatarMinutos(resultado.mediana))}
+      ${itemLegenda("#0a5c78", "Média", formatarMinutos(resultado.media))}
+      ${itemLegenda("#b9c5d0", "Maior espera", formatarMinutos(resultado.maximo))}
+    </ul>
+    <p class="dica">${observacao}</p>`;
 }
 
 // Ao abrir a página
